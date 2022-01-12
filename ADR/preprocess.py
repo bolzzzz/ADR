@@ -182,23 +182,22 @@ def split_to_windows_by_time(para, raw_data, event_mapping_data, dict_label, col
     assert event_count_matrix.shape[0] == len(labels)
     return event_count_matrix, labels
 
-def event_sequence_by_identifier(df_logs, col_identifier, col_EventId, col_bLabel, list_events_ids):
-
-    dict_EventId_SeqNum = {}
-    for idx, EventId in enumerate(list_events_ids):
-        dict_EventId_SeqNum[EventId] = idx + 1
-
-    df_logs['SeqNum'] = df_logs.apply(lambda row: dict_EventId_SeqNum[row[col_EventId]], axis=1)
-
-    df_event_sequence = pd.DataFrame(columns=['bLabel', 'seq'])
+def event_sequence_by_identifier(df_logs, col_identifier, col_EventId, col_bLabel):
+    df_seq = pd.DataFrame(columns=['bLabel', 'seq_EventId', 'seq_LineId', 'seq_bLabel'])
+    df_seq_ecm = pd.DataFrame()
     for iden, df_iden in df_logs.groupby(col_identifier):
-        df_event_sequence.loc[iden, 'seq'] = df_iden['SeqNum'].to_list()
-        if df_iden[col_bLabel].sum() > 0:
-            df_event_sequence.loc[iden, 'bLabel'] = 1
-        else:
-            df_event_sequence.loc[iden, 'bLabel'] = 0
+        df_iden['Timestamp'] = df_iden['Timestamp'].astype(int)
+        df_iden = df_iden.sort_values('Timestamp')
+        df_seq.loc[iden, 'seq_EventId'] = df_iden['EventId'].to_list()
+        df_seq.loc[iden, 'seq_LineId'] = df_iden['LineId'].to_list()
+        df_seq.loc[iden, 'seq_bLabel'] = df_iden['bLabel'].to_list()
+        ecm_iden_dict = df_iden['EventId'].value_counts().to_dict()
+        ecm_iden_df = pd.DataFrame(ecm_iden_dict, index=[iden])
+        df_seq_ecm = pd.concat([df_seq_ecm, ecm_iden_df])
 
-    return df_event_sequence
+        df_seq.loc[iden, 'bLabel'] = int(any(df_iden[col_bLabel]))
+
+    return df_seq, df_seq_ecm
 
 def event_count_by_identifier(df_logs, col_identifier, col_EventId, col_bLabel=None, list_events_ids=None):
     if col_bLabel is not None:
